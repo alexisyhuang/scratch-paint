@@ -35,9 +35,12 @@ class PaperCanvas extends React.Component {
             'maybeZoomToFit',
             'switchCostume',
             'onViewResize',
-            'recalibrateSize'
+            'recalibrateSize',
+            'importPreviousCostume'
         ]);
+        this.guideLayer = null;
     }
+
     componentDidMount () {
         paper.setup(this.canvas);
         paper.view.on('resize', this.onViewResize);
@@ -62,20 +65,38 @@ class PaperCanvas extends React.Component {
         // Don't show handles by default
         paper.settings.handleSize = 0;
         // Make layers.
-        setupLayers(this.props.format);
+        // potentially pass in prev costume as an arg to render with the background guide layer
+        console.log("beep", this.props);
+        this.guideLayer = setupLayers(this.props.format, this.props.previousCostume, this.props.prevRotationCenterX, this.props.prevRotationCenterY);
+        console.log(this.guideLayer);
         this.importImage(
             this.props.imageFormat, this.props.image, this.props.rotationCenterX, this.props.rotationCenterY);
+        /*if (this.props.previousCostume) {
+            this.importPreviousCostume(this.props.previousCostume);
+        }*/
     }
     componentWillReceiveProps (newProps) {
         if (this.props.imageId !== newProps.imageId) {
+            console.log("calling switch costume within will receive props");
             this.switchCostume(newProps.imageFormat, newProps.image,
                 newProps.rotationCenterX, newProps.rotationCenterY,
-                this.props.zoomLevelId, newProps.zoomLevelId);
+                this.props.zoomLevelId, newProps.zoomLevelId, newProps.prevImageFormat, newProps.previousCostume, newProps.prevRotationCenterX, newProps.prevRotationCenterY);
         }
+        console.log("checkthis:");
+        // console.log(this.props);
+        console.log(newProps);
+
+        //THIS IS WHERE MY ISSUE IS
+
+
+
         if (this.props.format !== newProps.format) {
             this.recalibrateSize();
             convertBackgroundGuideLayer(newProps.format);
         }
+        /*if (newProps.previousCostume && newProps.previousCostume !== this.props.previousCostume) {
+            this.importPreviousCostume(newProps.previousCostume);
+        }*/
     }
     componentWillUnmount () {
         this.clearQueuedImport();
@@ -96,7 +117,8 @@ class PaperCanvas extends React.Component {
             this.queuedImageToLoad = null;
         }
     }
-    switchCostume (format, image, rotationCenterX, rotationCenterY, oldZoomLevelId, newZoomLevelId) {
+    switchCostume (format, image, rotationCenterX, rotationCenterY, oldZoomLevelId, newZoomLevelId, prevImageFormat, previousCostume, prevRotationCenterX, prevRotationCenterY) {
+        console.log("switch");
         if (oldZoomLevelId && oldZoomLevelId !== newZoomLevelId) {
             this.props.saveZoomLevel();
         }
@@ -117,13 +139,48 @@ class PaperCanvas extends React.Component {
                 layer.removeChildren();
             }
         }
+        /* console.log(previousCostume);
+        if (previousCostume) {
+            console.log("meow");
+            // Add a new layer for the previous costume
+            const previousCostumeLayer = new paper.Layer();
+            previousCostumeLayer.data.isPreviousCostumeLayer = true;
+            previousCostumeLayer.opacity = 0.5; // Set opacity for onion skin effect
+    
+            // Import the previous costume onto the new layer
+            this.importPreviousCostume(previousCostume);
+    
+            // Ensure the previous costume layer is below the current drawing layer
+            previousCostumeLayer.sendToBack();
+        } */
+
         this.props.clearUndo();
         this.props.clearSelectedItems();
         this.props.clearHoveredItem();
         this.props.clearPasteOffset();
-        this.importImage(format, image, rotationCenterX, rotationCenterY);
+        if (previousCostume) {
+            console.log("trying to add: ",previousCostume);
+            console.log("woof, ", this.guideLayer);
+            // const previousCostumeRaster = new paper.Raster(previousCostume);
+            /*
+            const previousCostumeRaster = new paper.Group();
+            previousCostumeRaster.addChild(previousCostume);
+            console.log("see if this contains anything: ", previousCostumeRaster);
+            previousCostumeRaster.position = new paper.Point(prevRotationCenterX, prevRotationCenterY);
+            previousCostumeRaster.locked = true; // Lock the raster to make it unmodifiable
+            previousCostumeRaster.guide = true; // Mark as guide to ensure it's behind the painting layers
+            this.guideLayer.locked = false;
+            this.guideLayer.addChild(previousCostumeRaster);
+            this.guideLayer.locked = true;
+            console.log("woofed?, ", this.guideLayer);*/
+        }
+        this.importImage(format, image, rotationCenterX, rotationCenterY, prevImageFormat, previousCostume, prevRotationCenterX, prevRotationCenterY);
+        /* if (previousCostume) {
+            this.importPreviousCostume(previousCostume);
+        } */
+        // this.importPreviousCostume()
     }
-    importImage (format, image, rotationCenterX, rotationCenterY) {
+    importImage (format, image, rotationCenterX, rotationCenterY, prevImageFormat, previousCostume, prevRotationCenterX, prevRotationCenterY) {
         // Stop any in-progress imports
         this.clearQueuedImport();
 
@@ -133,7 +190,9 @@ class PaperCanvas extends React.Component {
             this.recalibrateSize();
             return;
         }
-
+        if (previousCostume) {
+            format = prevImageFormat;
+        }
         if (format === 'jpg' || format === 'png') {
             // import bitmap
             this.props.changeFormat(Formats.BITMAP_SKIP_CONVERT);
@@ -172,8 +231,12 @@ class PaperCanvas extends React.Component {
             };
             imgElement.src = image;
         } else if (format === 'svg') {
+            // handle case where both curr and prev costumes are not both svgs
             this.props.changeFormat(Formats.VECTOR_SKIP_CONVERT);
-            this.importSvg(image, rotationCenterX, rotationCenterY);
+            if (previousCostume) {
+                this.importSvg(previousCostume, prevRotationCenterX, prevRotationCenterY, true);
+            }
+            this.importSvg(image, rotationCenterX, rotationCenterY, false);
         } else {
             log.error(`Didn't recognize format: ${format}. Use 'jpg', 'png' or 'svg'.`);
             this.props.changeFormat(Formats.VECTOR_SKIP_CONVERT);
@@ -181,6 +244,77 @@ class PaperCanvas extends React.Component {
             this.recalibrateSize();
         }
     }
+    getImageFormat = (filename) => {
+        const extension = filename.split('.').pop().toLowerCase();
+        if (extension === 'jpg' || extension === 'jpeg') {
+            return 'jpg';
+        } else if (extension === 'png') {
+            return 'png';
+        } else if (extension === 'svg') {
+            return 'svg';
+        } else {
+            return null;
+        }
+    };    
+    importPreviousCostume(costume) {
+        // Stop any in-progress imports
+        this.clearQueuedImport();
+        console.log("MEOWWW ", costume);
+        if (!costume) {
+            this.props.changeFormat(Formats.VECTOR_SKIP_CONVERT);
+            performSnapshot(this.props.undoSnapshot, Formats.VECTOR_SKIP_CONVERT);
+            this.recalibrateSize();
+            return;
+        }
+        // const format = costume.dataFormat;
+        // console.log("format: ", this.getImageFormat(costume));
+        // const format = this.getImageFormat(costume);
+        // hard code a solution for now....
+        const format = "svg";
+        // console.log("previous costume props: ", costume)
+        // const image = costume.asset.url;
+        const rotationCenterX = costume.rotationCenterX;
+        const rotationCenterY = costume.rotationCenterY;
+    
+        if (format === 'jpg' || format === 'png') {
+            // Create a new layer for the onion skin
+            const onionSkinLayer = new paper.Layer();
+            onionSkinLayer.activate();
+    
+            const imgElement = new Image();
+            this.queuedImageToLoad = imgElement;
+            imgElement.onload = () => {
+                if (!this.queuedImageToLoad) return;
+                this.queuedImageToLoad = null;
+    
+                const raster = new paper.Raster(imgElement);
+                raster.opacity = 0.5; // Set opacity for onion skinning
+    
+                if (typeof rotationCenterX === 'undefined') {
+                    rotationCenterX = imgElement.width / 2;
+                }
+                if (typeof rotationCenterY === 'undefined') {
+                    rotationCenterY = imgElement.height / 2;
+                }
+    
+                raster.position = new paper.Point(
+                    (ART_BOARD_WIDTH / 2) - rotationCenterX,
+                    (ART_BOARD_HEIGHT / 2) - rotationCenterY
+                );
+    
+                // Move the onion skin layer below the current layer
+                onionSkinLayer.sendToBack();
+            };
+            imgElement.src = costume;
+        } else if (format === 'svg') {
+            this.props.changeFormat(Formats.VECTOR_SKIP_CONVERT);
+            this.importSvg(costume, rotationCenterX, rotationCenterY, true);
+            // add the previous layer first so that the regular one will be on top
+        } else {
+            log.error(`Didn't recognize format: ${format}. Use 'jpg', 'png' or 'svg'.`);
+        }
+    }
+    
     maybeZoomToFit (isBitmapMode) {
         if (this.shouldZoomToFit instanceof paper.Matrix) {
             paper.view.matrix = this.shouldZoomToFit;
@@ -193,7 +327,7 @@ class PaperCanvas extends React.Component {
         setWorkspaceBounds();
         this.props.updateViewBounds(paper.view.matrix);
     }
-    importSvg (svg, rotationCenterX, rotationCenterY) {
+    importSvg (svg, rotationCenterX, rotationCenterY, isOnionSkin) {
         const paperCanvas = this;
         // Pre-process SVG to prevent parsing errors (discussion from #213)
         // 1. Remove svg: namespace on elements.
@@ -236,16 +370,24 @@ class PaperCanvas extends React.Component {
                 // positioned incorrectly
                 paperCanvas.queuedImport = paperCanvas.recalibrateSize(() => {
                     paperCanvas.props.updateViewBounds(paper.view.matrix);
-                    paperCanvas.initializeSvg(item, rotationCenterX, rotationCenterY, viewBox);
+                    paperCanvas.initializeSvg(item, rotationCenterX, rotationCenterY, viewBox, isOnionSkin);
                 });
             }
         });
     }
-    initializeSvg (item, rotationCenterX, rotationCenterY, viewBox) {
+    initializeSvg (item, rotationCenterX, rotationCenterY, viewBox, isOnionSkin) {
+        console.log("Current active layer:", paper.project.activeLayer);
+
         if (this.queuedImport) this.queuedImport = null;
         const itemWidth = item.bounds.width;
         const itemHeight = item.bounds.height;
-
+        /*
+        let onionSkinLayer;
+        if (isOnionSkin) {
+            onionSkinLayer = new paper.Layer();
+            onionSkinLayer.name = 'Onion Skin Layer';
+            // onionSkinLayer.sendToBack(); // Ensure it's below the active layer
+        }*/
         // Get reference to viewbox
         let mask;
         if (item.clipped) {
@@ -266,7 +408,15 @@ class PaperCanvas extends React.Component {
         mask.size.height = MAX_WORKSPACE_BOUNDS.height;
         mask.size.width = MAX_WORKSPACE_BOUNDS.width;
         mask.setPosition(CENTER);
-        paper.project.activeLayer.addChild(mask);
+        // paper.project.activeLayer.addChild(mask);
+        /* if (onionSkinLayer) {
+            onionSkinLayer.addChild(mask); // Add mask to onion skin layer
+        } else {
+            paper.project.activeLayer.addChild(mask);
+        } */
+        if (!isOnionSkin) {
+            paper.project.activeLayer.addChild(mask);
+        }
         mask.clipMask = true;
 
         // Reduce single item nested in groups
@@ -288,8 +438,66 @@ class PaperCanvas extends React.Component {
             // Center
             item.translate(CENTER.subtract(itemWidth, itemHeight));
         }
+        const onionSkinOpacity = 0.5;
+        const tintColor = new paper.Color(1, 0, 0, 1);
+        
+        // if (onionSkinLayer) {
+        //     onionSkinLayer.addChild(item);
+            /* const tintedItem = item.clone();
+            tintedItem.fillColor = tintColor;
+            tintedItem.opacity = onionSkinOpacity;
+            tintedItem.blendMode = 'multiply';
+            onionSkinLayer.addChild(tintedItem); */
+            // tintRectangle.sendToBack();
 
-        paper.project.activeLayer.insertChild(0, item);
+
+            // this is the one that makes them look skinless
+            /*
+            item.children.forEach(child => {
+                child.fillColor = tintColor;
+                child.opacity = onionSkinOpacity;
+            });*/
+            
+        //     item.children.forEach(child => {
+        //         child.fillColor = tintColor;
+        //         child.opacity = 1;
+        //         child.blendMode = 'multiply';
+        //         child.locked = true;
+        //     });
+        //     onionSkinLayer.opacity = onionSkinOpacity;
+        //     onionSkinLayer.locked = true;
+        //     // onionSkinLayer.sendToBack();
+        //     onionSkinLayer.data.isBackgroundGuideLayer = true;
+        // } else {
+        //     paper.project.activeLayer.insertChild(0, item);
+        //     paper.project.activeLayer.visible = true;
+        // }
+        let onionSkinLayer;
+        if (isOnionSkin) {
+            console.log("meep");
+            /* this.guideLayer.locked = false;
+            item.opacity = onionSkinOpacity;
+            item.fillColor = tintColor;
+            this.guideLayer.addChild(item);
+            this.guideLayer.locked = true; */
+            this.guideLayer.children.forEach(child => {
+                if (child.name === 'Onion Skin Layer') {
+                    child.remove();
+                }
+            });
+            
+            onionSkinLayer = new paper.Layer();
+            onionSkinLayer.name = 'Onion Skin Layer';
+            onionSkinLayer.addChild(item);
+            onionSkinLayer.opacity = onionSkinOpacity;
+            this.guideLayer.locked = false;
+            this.guideLayer.addChild(onionSkinLayer);
+            this.guideLayer.locked = true;
+            console.log("guideLayer after most recent add: ", this.guideLayer);
+        } else {
+            paper.project.activeLayer.insertChild(0, item);
+        }
+        // paper.project.activeLayer.insertChild(0, item);
         if (isGroup(item)) {
             // Fixes an issue where we may export empty groups
             for (const child of item.children) {
@@ -370,7 +578,11 @@ PaperCanvas.propTypes = {
     zoomLevelId: PropTypes.string,
     zoomLevels: PropTypes.shape({
         currentZoomLevelId: PropTypes.string
-    })
+    }),
+    previousCostume: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.instanceOf(HTMLImageElement)
+    ]),
 };
 const mapStateToProps = state => ({
     mode: state.scratchPaint.mode,

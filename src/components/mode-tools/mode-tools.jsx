@@ -85,7 +85,7 @@ const ModeToolsComponent = props => {
             id: 'paint.modeTools.thickness'
         },
         flipHorizontal: {
-            defaultMessage: 'Flip Horizontal',
+            defaultMessage: 'Dolphins',
             description: 'Label for the button to flip the image horizontally',
             id: 'paint.modeTools.flipHorizontal'
         },

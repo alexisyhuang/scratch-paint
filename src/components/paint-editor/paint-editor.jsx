@@ -3,6 +3,8 @@ import classNames from 'classnames';
 import {defineMessages, injectIntl, intlShape} from 'react-intl';
 import React from 'react';
 import PropTypes from 'prop-types';
+import { useState } from 'react';
+
 
 import PaperCanvas from '../../containers/paper-canvas.jsx';
 import ScrollableCanvas from '../../containers/scrollable-canvas.jsx';
@@ -211,6 +213,11 @@ const PaintEditorComponent = props => (
                         rotationCenterY={props.rotationCenterY}
                         zoomLevelId={props.zoomLevelId}
                         onUpdateImage={props.onUpdateImage}
+                        previousCostume={props.previousCostume}
+                        prevRotationCenterX={props.prevRotationCenterX}
+                        prevRotationCenterY={props.prevRotationCenterY}
+                        prevImageFormat={props.prevImageFormat}
+                        isOnion={props.isOnion}
                     />
                     <textarea
                         className={styles.textArea}
@@ -259,6 +266,7 @@ const PaintEditorComponent = props => (
                                 </span>
                             </Button> : null
                     }
+                    {/*<Button onClick={toggleOnionSkin}>Onion Skin</Button>*/}
                     {/* Zoom controls */}
                     <InputGroup className={styles.zoomControls}>
                         <ButtonGroup>
@@ -327,6 +335,10 @@ PaintEditorComponent.propTypes = {
     onZoomIn: PropTypes.func.isRequired,
     onZoomOut: PropTypes.func.isRequired,
     onZoomReset: PropTypes.func.isRequired,
+    previousCostume: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.instanceOf(HTMLImageElement)
+    ]),
     rotationCenterX: PropTypes.number,
     rotationCenterY: PropTypes.number,
     rtl: PropTypes.bool,

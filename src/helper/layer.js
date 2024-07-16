@@ -316,6 +316,16 @@ const _makeBackgroundGuideLayer = function (format) {
     bitmapBackground.scaling = new paper.Point(CHECKERBOARD_SIZE, CHECKERBOARD_SIZE);
     bitmapBackground.guide = true;
     bitmapBackground.locked = true;
+    /*
+    if (previousCostume) {
+        console.log("in layer.js, previouscostume: ", previousCostume);
+        const previousCostumeRaster = new paper.Raster(previousCostume);
+        previousCostumeRaster.position = new paper.Point(prevRotationCenterX, prevRotationCenterY);
+        previousCostumeRaster.locked = true; // Lock the raster to make it unmodifiable
+        previousCostumeRaster.guide = true; // Mark as guide to ensure it's behind the painting layers
+        bitmapBackground.addChild(previousCostumeRaster);
+    }
+    */
     guideLayer.bitmapBackground = bitmapBackground;
 
     _convertLayer(guideLayer, format);
@@ -338,6 +348,7 @@ const setupLayers = function (format) {
     outlineLayer.bringToFront();
     guideLayer.bringToFront();
     paintLayer.activate();
+    return backgroundGuideLayer;
 };
 
 export {
